@@ -1,3 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* Zinc-based monochrome — light */
+    --background:         0 0% 98%;      /* zinc-50 */
+    --foreground:         240 6% 10%;    /* zinc-900 */
+
+    --card:               0 0% 100%;     /* white */
+    --card-foreground:    240 6% 10%;
+
+    --muted:              240 5% 96%;    /* zinc-100 */
+    --muted-foreground:   240 4% 46%;    /* zinc-500 */
+
+    --border:             240 6% 90%;    /* zinc-200 */
+    --input:              240 6% 90%;
+
+    --accent:             240 5% 96%;    /* zinc-100 */
+    --accent-foreground:  240 6% 10%;
+
+    --primary:            240 6% 10%;    /* zinc-900 */
+    --primary-foreground: 0 0% 98%;      /* zinc-50 */
+
+    --destructive:        0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --ring:               240 6% 10%;
+    --radius:             0.5rem;
+  }
+
+  .dark {
+    /* Zinc-based monochrome — dark */
+    --background:         240 10% 4%;    /* zinc-950 */
+    --foreground:         0 0% 98%;      /* zinc-50 */
+
+    --card:               240 6% 10%;    /* zinc-900 */
+    --card-foreground:    0 0% 98%;
+
+    --muted:              240 5% 15%;    /* zinc-800/900 blend */
+    --muted-foreground:   240 5% 65%;    /* zinc-400 */
+
+    --border:             240 5% 18%;    /* zinc-800 */
+    --input:              240 5% 18%;
+
+    --accent:             240 5% 15%;
+    --accent-foreground:  0 0% 98%;
+
+    --primary:            0 0% 98%;      /* zinc-50 */
+    --primary-foreground: 240 6% 10%;   /* zinc-900 */
+
+    --destructive:        0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --ring:               240 5% 65%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Smooth theme transitions — exclude layout-affecting props to avoid jank */
+  *,
+  *::before,
+  *::after {
+    transition-property: color, background-color, border-color, opacity, box-shadow;
+    transition-duration: 150ms;
+    transition-timing-function: ease;
+  }
+}

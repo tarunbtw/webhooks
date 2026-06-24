@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Button } from '@tremor/react'
+import { Copy, Check } from 'lucide-react'
+import { Button } from './ui/button'
+import { Tooltip } from './ui/tooltip'
 
 interface Props {
   text: string
@@ -16,8 +18,14 @@ export function CopyButton({ text, label = 'Copy' }: Props) {
   }
 
   return (
-    <Button size="xs" variant="secondary" onClick={copy}>
-      {copied ? '✓ Copied' : label}
-    </Button>
+    <Tooltip content={copied ? 'Copied!' : label} side="bottom">
+      <Button variant="ghost" size="icon" onClick={copy} aria-label={label}>
+        {copied ? (
+          <Check className="h-3.5 w-3.5 text-foreground" />
+        ) : (
+          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
+      </Button>
+    </Tooltip>
   )
 }

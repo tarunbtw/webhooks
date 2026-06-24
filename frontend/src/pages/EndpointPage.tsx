@@ -1,12 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Badge, Button, Text } from '@tremor/react'
-import { api } from '../api/client'
-import { useWebSocket } from '../hooks/useWebSocket'
+import { Trash2, Terminal, Activity } from 'lucide-react'
+import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
+import { Separator } from '../components/ui/separator'
+import { Tooltip } from '../components/ui/tooltip'
+import { ThemeToggle } from '../components/ThemeToggle'
+import { CopyButton } from '../components/CopyButton'
 import { RequestList } from '../components/RequestList'
 import { RequestDetail } from '../components/RequestDetail'
-import { CopyButton } from '../components/CopyButton'
+import { api } from '../api/client'
+import { useWebSocket } from '../hooks/useWebSocket'
 import type { Request, WSMessage } from '../types'
+
+const STORAGE_KEY = 'wi-last-endpoint'
 
 export function EndpointPage() {
   const { id } = useParams<{ id: string }>()
@@ -14,97 +21,152 @@ export function EndpointPage() {
   const [requests, setRequests] = useState<Request[]>([])
   const [selected, setSelected] = useState<Request | null>(null)
   const [loading, setLoading] = useState(true)
+  const [deleting, setDeleting] = useState(false)
 
   const inspectUrl = `${window.location.origin}/r/${id}`
 
-  // load existing requests on mount
+  // Persist this endpoint so the landing page can offer "Continue"
+  useEffect(() => {
+    if (id) localStorage.setItem(STORAGE_KEY, id)
+  }, [id])
+
+  // Load existing requests on mount
   useEffect(() => {
     if (!id) return
     api.listRequests(id)
-      .then(setRequests)
+      .then((r) => { setRequests(r); setLoading(false) })
       .catch(() => navigate('/'))
-      .finally(() => setLoading(false))
   }, [id, navigate])
 
-  // handle incoming real-time messages
+  // Real-time WebSocket updates
   const onMessage = useCallback((msg: WSMessage) => {
     if (msg.type === 'request.received') {
-      setRequests(prev => [msg.data, ...prev].slice(0, 100))
+      setRequests((prev) => [msg.data, ...prev].slice(0, 100))
     }
   }, [])
 
   useWebSocket({ endpointId: id!, onMessage })
 
-  const handleDelete = (reqId: string) => {
-    setRequests(prev => prev.filter(r => r.id !== reqId))
+  const handleDeleteRequest = (reqId: string) => {
+    setRequests((prev) => prev.filter((r) => r.id !== reqId))
     if (selected?.id === reqId) setSelected(null)
   }
 
   const handleDeleteEndpoint = async () => {
-    if (!confirm('Delete this endpoint and all its requests?')) return
-    await api.deleteEndpoint(id!)
-    navigate('/')
+    if (!confirm('Delete this endpoint and all its requests? This cannot be undone.')) return
+    setDeleting(true)
+    try {
+      await api.deleteEndpoint(id!)
+      localStorage.removeItem(STORAGE_KEY)  // clear persisted endpoint
+      navigate('/')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Text>Loading...</Text>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+          Loading…
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Top bar */}
-      <div className="bg-white border-b px-4 py-3 flex items-center gap-3 flex-wrap">
-        <span
-          className="font-semibold text-gray-800 cursor-pointer hover:underline"
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* ── Top navbar ── */}
+      <header className="flex items-center gap-2 px-3 h-12 border-b border-border bg-card flex-shrink-0">
+        {/* Logo */}
+        <button
           onClick={() => navigate('/')}
+          className="flex items-center gap-1.5 text-sm font-semibold hover:opacity-70 transition-opacity shrink-0"
         >
-          webhook inspector
-        </span>
-        <span className="text-gray-300">/</span>
-        <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono text-gray-700 truncate max-w-sm">
-          {inspectUrl}
-        </code>
-        <CopyButton text={inspectUrl} label="Copy URL" />
-        <Badge color="green" className="ml-auto">
-          {requests.length} requests
-        </Badge>
-        <Button size="xs" variant="secondary" color="red" onClick={handleDeleteEndpoint}>
-          Delete endpoint
-        </Button>
-      </div>
+          <Terminal className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">webhook inspector</span>
+        </button>
 
-      {/* Split view */}
-      <div className="flex flex-1 overflow-hidden">
+        <Separator className="h-4 w-px border-0 bg-border hidden sm:block shrink-0" />
+
+        {/* Endpoint URL + copy */}
+        <div className="flex items-center gap-1 min-w-0 flex-1">
+          <code className="text-xs font-mono text-muted-foreground truncate">
+            {inspectUrl}
+          </code>
+          <CopyButton text={inspectUrl} label="Copy endpoint URL" />
+        </div>
+
+        {/* Live indicator + request count */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Activity className="h-3 w-3 text-muted-foreground/50 animate-pulse" />
+          <Badge variant="outline" className="tabular-nums text-xs">
+            {requests.length} {requests.length === 1 ? 'request' : 'requests'}
+          </Badge>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1 shrink-0">
+          <ThemeToggle />
+          <Tooltip content="Delete endpoint" side="bottom">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteEndpoint}
+              loading={deleting}
+              aria-label="Delete endpoint"
+              className="h-7 px-2.5 text-xs gap-1.5"
+            >
+              <Trash2 className="h-3 w-3" />
+              <span className="hidden sm:inline">Delete</span>
+            </Button>
+          </Tooltip>
+        </div>
+      </header>
+
+      {/* ── Split panel ── */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Left — request list */}
-        <div className="w-64 flex-shrink-0 border-r bg-white overflow-hidden flex flex-col">
-          <div className="px-4 py-2 border-b">
-            <Text className="text-xs text-gray-400 uppercase tracking-wide font-medium">
-              Requests
-            </Text>
+        <div className="w-56 sm:w-64 flex-shrink-0 border-r border-border bg-card flex flex-col overflow-hidden">
+          <div className="px-3 py-2 border-b border-border bg-muted/40 flex-shrink-0">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Incoming Requests
+            </span>
           </div>
-          <RequestList
-            requests={requests}
-            selectedId={selected?.id ?? null}
-            onSelect={setSelected}
-          />
+          <div className="flex-1 overflow-hidden">
+            <RequestList
+              requests={requests}
+              selectedId={selected?.id ?? null}
+              onSelect={setSelected}
+            />
+          </div>
         </div>
 
         {/* Right — request detail */}
-        <div className="flex-1 overflow-hidden bg-white">
+        <div className="flex-1 overflow-hidden bg-background flex flex-col">
           {selected ? (
-            <RequestDetail request={selected} onDelete={handleDelete} />
+            <RequestDetail request={selected} onDelete={handleDeleteRequest} />
           ) : (
             <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <Text className="text-gray-400">Select a request to inspect it</Text>
-                <Text className="text-gray-300 text-xs mt-2">
-                  Or send one to:{' '}
-                  <code className="font-mono">{inspectUrl}</code>
-                </Text>
+              <div className="text-center space-y-3 max-w-xs px-4">
+                <div className="h-10 w-10 rounded-full border border-border flex items-center justify-center mx-auto">
+                  <Activity className="h-4 w-4 text-muted-foreground/50" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">
+                    Waiting for requests
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Select one from the list, or send a request to:
+                  </p>
+                  <p className="text-xs font-mono text-muted-foreground/80 bg-muted rounded px-2 py-1 break-all">
+                    {inspectUrl}
+                  </p>
+                </div>
               </div>
             </div>
           )}
