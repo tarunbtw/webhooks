@@ -76,6 +76,10 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	h.subscribe(endpointID, c)
 	defer h.unsubscribe(endpointID, c)
 
+	// done is closed when the read loop exits (client disconnects).
+	// the ping goroutine selects on it to exit cleanly — no goroutine leak.
+	done := make(chan struct{})
+
 	// writer goroutine — sends queued messages to the client
 	go func() {
 		defer conn.Close()
@@ -98,10 +102,16 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
+	// ping goroutine — exits via done channel when client disconnects
 	go func() {
-		for range ticker.C {
-			conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+		for {
+			select {
+			case <-ticker.C:
+				conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					return
+				}
+			case <-done:
 				return
 			}
 		}
@@ -114,7 +124,8 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	close(c.send)
+	close(done)    // signal ping goroutine to exit
+	close(c.send)  // signal writer goroutine to exit
 }
 
 func (h *Hub) subscribe(endpointID string, c *client) {
