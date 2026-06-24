@@ -1,1 +1,37 @@
+# Local
+.env
+.env.local
+
+# IDEs and OS overhead
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Frontend
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.eslintcache
+.vite/
+
+# Backend
+backend/server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Docker
+pgdata/
+
+# eh
 agents
