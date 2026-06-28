@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Trash2, Terminal, Activity } from 'lucide-react'
+import { Trash2, Webhook, Activity } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Separator } from '../components/ui/separator'
@@ -87,10 +87,10 @@ export function EndpointPage() {
         {/* Logo */}
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-1.5 text-sm font-semibold hover:opacity-70 transition-opacity shrink-0"
+          className="flex items-center gap-2 hover:opacity-70 transition-opacity shrink-0"
         >
-          <Terminal className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">webhook inspector</span>
+          <Webhook className="h-4 w-4 text-foreground" strokeWidth={2} />
+          <span className="hidden sm:inline text-sm font-semibold tracking-tight">webhooks</span>
         </button>
 
         <Separator className="h-4 w-px border-0 bg-border hidden sm:block shrink-0" />

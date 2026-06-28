@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { Trash2, Send, ChevronRight } from 'lucide-react'
+import { Send, ChevronRight } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Input } from './ui/input'
 import { Separator } from './ui/separator'
-import { ConfirmDialog } from './ui/dialog'
 import { api } from '../api/client'
 import type { Request } from '../types'
 
@@ -57,13 +56,11 @@ function KVTable({ data }: { data: Record<string, string> }) {
   )
 }
 
-export function RequestDetail({ request, onDelete }: Props) {
+export function RequestDetail({ request }: Props) {
   const [tab, setTab] = useState<Tab>('headers')
   const [replayUrl, setReplayUrl] = useState('')
   const [replayResult, setReplayResult] = useState<{ status: number; body: string } | null>(null)
   const [replaying, setReplaying] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const handleReplay = async () => {
     if (!replayUrl) return
@@ -76,17 +73,6 @@ export function RequestDetail({ request, onDelete }: Props) {
       setReplayResult({ status: 0, body: String(e) })
     } finally {
       setReplaying(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    setDeleting(true)
-    try {
-      await api.deleteRequest(request.id)
-      onDelete(request.id)
-    } finally {
-      setDeleting(false)
-      setDeleteDialogOpen(false)
     }
   }
 
@@ -118,31 +104,7 @@ export function RequestDetail({ request, onDelete }: Props) {
             </span>
           )}
         </div>
-
-        <Button
-          variant="default"
-          size="sm"
-          onClick={() => setDeleteDialogOpen(true)}
-          aria-label="Delete request"
-          className="h-7 px-2.5 text-xs gap-1.5 shrink-0"
-        >
-          <Trash2 className="h-3 w-3" />
-          <span className="hidden sm:inline">Delete</span>
-        </Button>
       </div>
-
-      {/* Delete request confirmation dialog */}
-      <ConfirmDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        title="Delete this request?"
-        description="The captured request data will be permanently removed. This action cannot be undone."
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-        onConfirm={handleDelete}
-        loading={deleting}
-        icon={<Trash2 className="h-4 w-4 text-muted-foreground" />}
-      />
 
       {/* ── Tabs ── */}
       <div className="flex border-b border-border bg-muted/30 flex-shrink-0">

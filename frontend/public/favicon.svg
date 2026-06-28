@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#18181b"/>
+  <!-- webhook hook shape: arc + arrow -->
+  <g fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- small circle at top left (hook anchor) -->
+    <circle cx="10" cy="9" r="2.5"/>
+    <!-- arc from anchor into main loop -->
+    <path d="M12.5 9h2A5.5 5.5 0 1 1 9 14.5"/>
+    <!-- arrow going down from loop -->
+    <path d="M9 14.5L6 22"/>
+  </g>
+</svg>
