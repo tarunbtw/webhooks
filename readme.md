@@ -1,4 +1,4 @@
-# webhook-inspector
+# webhooks ( site )
 
 Inspect HTTP requests in real time. Get a unique URL, point any webhook at it, watch requests arrive live — headers, body, query params, all of it.
 
