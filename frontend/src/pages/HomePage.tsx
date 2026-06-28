@@ -85,7 +85,7 @@ export function HomePage() {
           {/* Right side */}
           <div className="flex items-center gap-1">
             <a
-              href="https://github.com/tarunbtw/webhook-inspector"
+              href="https://github.com/tarunbtw/webhooks"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="View on GitHub"
@@ -114,7 +114,7 @@ export function HomePage() {
 
           <p className="text-base text-muted-foreground leading-relaxed max-w-sm mx-auto">
             Get a unique URL. Send any HTTP request. See headers, body, and
-            query params arrive live — no account required.
+            query params arrive live.
           </p>
 
           <div className="pt-2 flex items-center justify-center">
