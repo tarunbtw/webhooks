@@ -33,6 +33,8 @@ This document contains the directory structure and the full contents of all sour
 │   ├── Dockerfile
 │   └── go.mod
 └── frontend
+    ├── public
+    │   └── favicon.svg
     ├── src
     │   ├── api
     │   │   └── client.ts
@@ -40,6 +42,7 @@ This document contains the directory structure and the full contents of all sour
     │   │   ├── ui
     │   │   │   ├── badge.tsx
     │   │   │   ├── button.tsx
+    │   │   │   ├── dialog.tsx
     │   │   │   ├── input.tsx
     │   │   │   ├── separator.tsx
     │   │   │   └── tooltip.tsx
@@ -121,6 +124,7 @@ pgdata/
 
 # eh
 agents
+context.md
 ```
 
 ### `docker-compose.yml`
@@ -1118,7 +1122,8 @@ CMD ["nginx", "-g", "daemon off;"]
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>webhook inspector</title>
+    <title>webhooks</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body>
     <div id="root"></div>
@@ -1349,6 +1354,22 @@ export default defineConfig({
 })
 ```
 
+### `frontend/public/favicon.svg`
+```xml
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#18181b"/>
+  <!-- webhook hook shape: arc + arrow -->
+  <g fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- small circle at top left (hook anchor) -->
+    <circle cx="10" cy="9" r="2.5"/>
+    <!-- arc from anchor into main loop -->
+    <path d="M12.5 9h2A5.5 5.5 0 1 1 9 14.5"/>
+    <!-- arrow going down from loop -->
+    <path d="M9 14.5L6 22"/>
+  </g>
+</svg>
+```
+
 ### `frontend/src/App.tsx`
 ```tsx
 import { Routes, Route } from 'react-router-dom'
@@ -1552,7 +1573,7 @@ export function CopyButton({ text, label = 'Copy' }: Props) {
 ### `frontend/src/components/RequestDetail.tsx`
 ```tsx
 import { useState } from 'react'
-import { Trash2, Send, ChevronRight } from 'lucide-react'
+import { Send, ChevronRight } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
@@ -1609,12 +1630,11 @@ function KVTable({ data }: { data: Record<string, string> }) {
   )
 }
 
-export function RequestDetail({ request, onDelete }: Props) {
+export function RequestDetail({ request }: Props) {
   const [tab, setTab] = useState<Tab>('headers')
   const [replayUrl, setReplayUrl] = useState('')
   const [replayResult, setReplayResult] = useState<{ status: number; body: string } | null>(null)
   const [replaying, setReplaying] = useState(false)
-  const [deleting, setDeleting] = useState(false)
 
   const handleReplay = async () => {
     if (!replayUrl) return
@@ -1628,12 +1648,6 @@ export function RequestDetail({ request, onDelete }: Props) {
     } finally {
       setReplaying(false)
     }
-  }
-
-  const handleDelete = async () => {
-    setDeleting(true)
-    await api.deleteRequest(request.id)
-    onDelete(request.id)
   }
 
   const tabs: { id: Tab; label: string }[] = [
@@ -1664,18 +1678,6 @@ export function RequestDetail({ request, onDelete }: Props) {
             </span>
           )}
         </div>
-
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={handleDelete}
-          loading={deleting}
-          aria-label="Delete request"
-          className="h-7 px-2.5 text-xs gap-1.5 shrink-0"
-        >
-          <Trash2 className="h-3 w-3" />
-          <span className="hidden sm:inline">Delete</span>
-        </Button>
       </div>
 
       {/* ── Tabs ── */}
@@ -2026,6 +2028,151 @@ Button.displayName = 'Button'
 export { Button, buttonVariants }
 ```
 
+### `frontend/src/components/ui/dialog.tsx`
+```tsx
+import * as React from 'react'
+import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
+import { cn } from '../../lib/utils'
+import { Button } from './button'
+
+interface ConfirmDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  description?: string
+  /** Label for the confirm/destructive action */
+  confirmLabel?: string
+  /** Label for the cancel action */
+  cancelLabel?: string
+  onConfirm: () => void | Promise<void>
+  /** Show spinner on confirm button while async action runs */
+  loading?: boolean
+  /** Icon shown at the top of the dialog */
+  icon?: React.ReactNode
+}
+
+export function ConfirmDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
+  onConfirm,
+  loading = false,
+  icon,
+}: ConfirmDialogProps) {
+  // Close on Escape
+  React.useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onOpenChange(false)
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [open, onOpenChange])
+
+  // Prevent body scroll while open
+  React.useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [open])
+
+  if (!open) return null
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dialog-title"
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-background/30 backdrop-blur-[2px]"
+        onClick={() => !loading && onOpenChange(false)}
+      />
+
+      {/* Panel */}
+      <div
+        className={cn(
+          'relative z-10 w-full max-w-sm mx-4',
+          'rounded-lg border border-border bg-card shadow-lg',
+          'animate-in fade-in-0 zoom-in-95 duration-150',
+        )}
+      >
+        {/* Close button */}
+        <button
+          onClick={() => !loading && onOpenChange(false)}
+          disabled={loading}
+          aria-label="Close dialog"
+          className={cn(
+            'absolute top-3 right-3',
+            'inline-flex items-center justify-center rounded-md p-1',
+            'text-muted-foreground hover:text-foreground hover:bg-accent',
+            'transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            'disabled:pointer-events-none disabled:opacity-50',
+          )}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+
+        <div className="p-6">
+          {/* Optional icon */}
+          {icon && (
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted">
+              {icon}
+            </div>
+          )}
+
+          {/* Title */}
+          <h2
+            id="dialog-title"
+            className="text-sm font-semibold text-foreground leading-snug pr-6"
+          >
+            {title}
+          </h2>
+
+          {/* Description */}
+          {description && (
+            <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+              {description}
+            </p>
+          )}
+
+          {/* Actions */}
+          <div className="mt-5 flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
+              {cancelLabel}
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onConfirm}
+              loading={loading}
+              className="min-w-[72px]"
+            >
+              {confirmLabel}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+```
+
 ### `frontend/src/components/ui/input.tsx`
 ```tsx
 import * as React from 'react'
@@ -2190,11 +2337,12 @@ export function cn(...inputs: ClassValue[]) {
 ```tsx
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Trash2, Terminal, Activity } from 'lucide-react'
+import { Trash2, Webhook, Activity } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Separator } from '../components/ui/separator'
 import { Tooltip } from '../components/ui/tooltip'
+import { ConfirmDialog } from '../components/ui/dialog'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { CopyButton } from '../components/CopyButton'
 import { RequestList } from '../components/RequestList'
@@ -2212,6 +2360,7 @@ export function EndpointPage() {
   const [selected, setSelected] = useState<Request | null>(null)
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const inspectUrl = `${window.location.origin}/r/${id}`
 
@@ -2243,7 +2392,6 @@ export function EndpointPage() {
   }
 
   const handleDeleteEndpoint = async () => {
-    if (!confirm('Delete this endpoint and all its requests? This cannot be undone.')) return
     setDeleting(true)
     try {
       await api.deleteEndpoint(id!)
@@ -2251,6 +2399,7 @@ export function EndpointPage() {
       navigate('/')
     } finally {
       setDeleting(false)
+      setDeleteDialogOpen(false)
     }
   }
 
@@ -2275,10 +2424,10 @@ export function EndpointPage() {
         {/* Logo */}
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-1.5 text-sm font-semibold hover:opacity-70 transition-opacity shrink-0"
+          className="flex items-center gap-2 hover:opacity-70 transition-opacity shrink-0"
         >
-          <Terminal className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">webhook inspector</span>
+          <Webhook className="h-4 w-4 text-foreground" strokeWidth={2} />
+          <span className="hidden sm:inline text-sm font-semibold tracking-tight">webhooks</span>
         </button>
 
         <Separator className="h-4 w-px border-0 bg-border hidden sm:block shrink-0" />
@@ -2304,10 +2453,9 @@ export function EndpointPage() {
           <ThemeToggle />
           <Tooltip content="Delete endpoint" side="bottom">
             <Button
-              variant="destructive"
+              variant="default"
               size="sm"
-              onClick={handleDeleteEndpoint}
-              loading={deleting}
+              onClick={() => setDeleteDialogOpen(true)}
               aria-label="Delete endpoint"
               className="h-7 px-2.5 text-xs gap-1.5"
             >
@@ -2316,6 +2464,19 @@ export function EndpointPage() {
             </Button>
           </Tooltip>
         </div>
+
+        {/* Delete endpoint confirmation dialog */}
+        <ConfirmDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          title="Delete endpoint?"
+          description="This will permanently delete the endpoint and all its captured requests. This action cannot be undone."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={handleDeleteEndpoint}
+          loading={deleting}
+          icon={<Trash2 className="h-4 w-4 text-muted-foreground" />}
+        />
       </header>
 
       {/* ── Split panel ── */}
@@ -2371,39 +2532,32 @@ export function EndpointPage() {
 ```tsx
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Zap, RefreshCcw, Clock, Globe, ArrowRight, Terminal } from 'lucide-react'
+import { ArrowRight, Webhook, RefreshCcw, Clock, Globe, Github } from 'lucide-react'
 import { Button } from '../components/ui/button'
-import { Separator } from '../components/ui/separator'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { api } from '../api/client'
 
 const FEATURES = [
   {
-    icon: Zap,
-    title: 'Real-time delivery',
-    description: 'Requests appear instantly via WebSocket — no polling, no refresh.',
+    icon: Webhook,
+    title: 'Real-time',
+    description: 'Requests appear the moment they arrive via WebSocket — zero polling.',
   },
   {
     icon: Globe,
-    title: 'Any HTTP method',
-    description: 'GET, POST, PUT, PATCH, DELETE — every method, every content type.',
+    title: 'Any method',
+    description: 'GET, POST, PUT, PATCH, DELETE — every verb, every content type.',
   },
   {
     icon: RefreshCcw,
-    title: 'Request replay',
-    description: 'Forward any captured request to a target URL with one click.',
+    title: 'Replay',
+    description: 'Resend any captured request to a target URL with one click.',
   },
   {
     icon: Clock,
-    title: '48-hour TTL',
-    description: 'Requests are automatically cleaned up after 48 hours.',
+    title: '48 h TTL',
+    description: 'Requests are automatically purged after 48 hours. No cleanup needed.',
   },
-]
-
-const STEPS = [
-  { n: '01', title: 'Create an endpoint', body: 'Click the button below. You get a unique inspect URL instantly — no signup.' },
-  { n: '02', title: 'Send requests to it', body: 'Point any webhook, curl command, or HTTP client at your inspect URL.' },
-  { n: '03', title: 'Inspect in real time', body: 'See headers, body, query params, and source IP as they arrive live.' },
 ]
 
 const STORAGE_KEY = 'wi-last-endpoint'
@@ -2413,7 +2567,6 @@ export function HomePage() {
   const [existingId, setExistingId] = useState<string | null>(null)
   const navigate = useNavigate()
 
-  // Silently validate any previously saved endpoint in the background
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
@@ -2423,7 +2576,6 @@ export function HomePage() {
     }
   }, [])
 
-  // If a valid endpoint exists → take them there. Otherwise create a fresh one.
   const handleCreate = async () => {
     setLoading(true)
     try {
@@ -2440,129 +2592,91 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
+
       {/* ── Navbar ── */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-sm">
-        <div className="mx-auto max-w-5xl px-4 h-14 flex items-center justify-between">
+      <header className="fixed top-0 left-0 right-0 z-40">
+        <div className="mx-auto max-w-5xl px-6 h-16 flex items-center justify-between">
+
+          {/* Logo */}
           <div className="flex items-center gap-2">
-            <Terminal className="h-4 w-4 text-foreground" />
-            <span className="text-sm font-semibold tracking-tight">webhook inspector</span>
+            <Webhook className="h-4 w-4 text-foreground" strokeWidth={2} />
+            <span className="text-sm font-semibold tracking-tight">webhooks</span>
           </div>
-          <ThemeToggle />
+
+          {/* Right side */}
+          <div className="flex items-center gap-1">
+            <a
+              href="https://github.com/tarunbtw/webhook-inspector"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="View on GitHub"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <Github className="h-4 w-4" />
+            </a>
+            <ThemeToggle />
+            <div className="w-px h-4 bg-border mx-1" />
+            <Button size="sm" onClick={handleCreate} loading={loading} className="gap-1.5">
+              Get started
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       </header>
 
       {/* ── Hero ── */}
-      <section className="flex-1 flex flex-col items-center justify-center text-center px-4 py-24 gap-8">
-        <div className="space-y-4 max-w-2xl">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
-            Self-hostable · Open source · No signup
-          </div>
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground leading-tight">
-            Inspect webhooks<br />in real time
+      <section className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-32 pb-28">
+        <div className="max-w-xl space-y-5">
+
+          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight leading-[1.1]">
+            Inspect webhooks<br />
+            <span className="text-muted-foreground font-medium">in real time.</span>
           </h1>
-          <p className="text-base text-muted-foreground max-w-lg mx-auto leading-relaxed">
-            Get a unique URL. Send any HTTP request to it. See every header,
-            body, and query parameter arrive instantly — no signup required.
+
+          <p className="text-base text-muted-foreground leading-relaxed max-w-sm mx-auto">
+            Get a unique URL. Send any HTTP request. See headers, body, and
+            query params arrive live — no account required.
           </p>
-        </div>
 
-        {/* Two clean buttons — no banner, no extra UI */}
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <Button size="lg" onClick={handleCreate} loading={loading} className="min-w-48">
-            Create endpoint
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-          <Button size="lg" variant="outline" onClick={() => window.open('https://github.com', '_blank')}>
-            View on GitHub
-          </Button>
-        </div>
-
-        {/* Quick usage hint */}
-        <div className="rounded-lg border border-border bg-muted/50 px-4 py-3 text-left max-w-md w-full">
-          <p className="text-xs text-muted-foreground mb-1.5 font-mono">Quick start</p>
-          <code className="text-xs font-mono text-foreground block leading-relaxed">
-            curl -X POST https://your-url/r/&#123;id&#125; \<br />
-            {'  '}-H "Content-Type: application/json" \<br />
-            {'  '}-d '&#123;"hello":"world"&#125;'
-          </code>
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* ── Features ── */}
-      <section className="py-20 px-4">
-        <div className="mx-auto max-w-5xl">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl font-semibold tracking-tight">Everything you need to debug webhooks</h2>
-            <p className="text-sm text-muted-foreground mt-2">No fluff. Just the tools.</p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {FEATURES.map(({ icon: Icon, title, description }) => (
-              <div
-                key={title}
-                className="rounded-lg border border-border bg-card p-5 space-y-3 hover:bg-accent/50 transition-colors"
-              >
-                <div className="h-8 w-8 rounded-md border border-border flex items-center justify-center">
-                  <Icon className="h-4 w-4 text-foreground" />
-                </div>
-                <h3 className="text-sm font-semibold">{title}</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* ── How it works ── */}
-      <section className="py-20 px-4">
-        <div className="mx-auto max-w-3xl">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
-          </div>
-          <div className="space-y-0">
-            {STEPS.map(({ n, title, body }, i) => (
-              <div key={n} className="flex gap-6">
-                <div className="flex flex-col items-center">
-                  <div className="h-9 w-9 rounded-full border border-border flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-mono text-muted-foreground">{n}</span>
-                  </div>
-                  {i < STEPS.length - 1 && (
-                    <div className="w-px flex-1 bg-border my-2" />
-                  )}
-                </div>
-                <div className="pb-10 pt-1.5 min-w-0">
-                  <h3 className="text-sm font-semibold mb-1">{title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 flex justify-center">
-            <Button size="lg" onClick={handleCreate} loading={loading} className="min-w-48">
-              Get started
+          <div className="pt-2 flex items-center justify-center">
+            <Button size="lg" onClick={handleCreate} loading={loading} className="min-w-44 gap-2">
+              Create endpoint
               <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </section>
 
-      <Separator />
+      {/* ── Features ── */}
+      <section className="pb-28 px-6">
+        <div className="mx-auto max-w-4xl">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-border rounded-xl overflow-hidden border border-border">
+            {FEATURES.map(({ icon: Icon, title, description }) => (
+              <div
+                key={title}
+                className="bg-card p-6 space-y-3 hover:bg-accent/40 transition-colors"
+              >
+                <Icon className="h-4 w-4 text-foreground" strokeWidth={1.75} />
+                <div>
+                  <p className="text-sm font-semibold">{title}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                    {description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* ── Footer ── */}
-      <footer className="py-8 px-4">
-        <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Terminal className="h-3 w-3" />
-            <span>webhook inspector</span>
-          </div>
-          <span>Self-hosted · Requests expire after 48 hours</span>
+      <footer className="pb-10 px-6">
+        <div className="flex flex-col items-center gap-1">
+          <p className="text-xs text-muted-foreground/70 font-medium">webhooks</p>
+          <p className="text-xs text-muted-foreground/40">built with Go</p>
         </div>
       </footer>
+
     </div>
   )
 }

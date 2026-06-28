@@ -52,6 +52,7 @@ export function HomePage() {
         return
       }
       const ep = await api.createEndpoint()
+      localStorage.setItem(STORAGE_KEY, ep.id)
       navigate(`/e/${ep.id}`)
     } finally {
       setLoading(false)

@@ -27,7 +27,7 @@ var hopByHopHeaders = map[string]bool{
 
 type ReceiverHandler struct {
 	db *pgxpool.Pool
-	// Hub will be injected in Phase 3. Nil here means no broadcast.
+	// Broadcast is wired in from main.go. Nil means no broadcast (safe).
 	Broadcast func(endpointID string, req *models.Request)
 }
 
@@ -104,7 +104,7 @@ func (h *ReceiverHandler) Receive(w http.ResponseWriter, r *http.Request) {
 			`UPDATE endpoints SET last_used_at = NOW() WHERE id = $1`, endpointID)
 	}()
 
-	// broadcast to WebSocket hub if wired up (Phase 3)
+	// broadcast to WebSocket hub
 	if h.Broadcast != nil {
 		h.Broadcast(endpointID, &req)
 	}
