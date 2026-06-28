@@ -60,7 +60,17 @@ export function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-screen bg-background text-foreground flex flex-col relative overflow-hidden">
+
+      {/* ── Background decoration ── */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        {/* Dot grid with radial fade */}
+        <div className="absolute inset-0 bg-dot-grid" />
+        {/* Single soft orb — drifts slowly behind the hero */}
+        <div
+          className="absolute -top-32 left-1/2 w-[720px] h-[720px] rounded-full animate-orb bg-orb"
+        />
+      </div>
 
       {/* ── Navbar ── */}
       <header className="fixed top-0 left-0 right-0 z-40">
@@ -141,7 +151,6 @@ export function HomePage() {
       {/* ── Footer ── */}
       <footer className="pb-10 px-6">
         <div className="flex flex-col items-center gap-1">
-          <p className="text-xs text-muted-foreground/70 font-medium">webhooks</p>
           <p className="text-xs text-muted-foreground/40">built with Go</p>
         </div>
       </footer>
