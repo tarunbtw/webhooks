@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Separator } from '../components/ui/separator'
 import { Tooltip } from '../components/ui/tooltip'
+import { ConfirmDialog } from '../components/ui/dialog'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { CopyButton } from '../components/CopyButton'
 import { RequestList } from '../components/RequestList'
@@ -22,6 +23,7 @@ export function EndpointPage() {
   const [selected, setSelected] = useState<Request | null>(null)
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const inspectUrl = `${window.location.origin}/r/${id}`
 
@@ -53,7 +55,6 @@ export function EndpointPage() {
   }
 
   const handleDeleteEndpoint = async () => {
-    if (!confirm('Delete this endpoint and all its requests? This cannot be undone.')) return
     setDeleting(true)
     try {
       await api.deleteEndpoint(id!)
@@ -61,6 +62,7 @@ export function EndpointPage() {
       navigate('/')
     } finally {
       setDeleting(false)
+      setDeleteDialogOpen(false)
     }
   }
 
@@ -114,10 +116,9 @@ export function EndpointPage() {
           <ThemeToggle />
           <Tooltip content="Delete endpoint" side="bottom">
             <Button
-              variant="destructive"
+              variant="default"
               size="sm"
-              onClick={handleDeleteEndpoint}
-              loading={deleting}
+              onClick={() => setDeleteDialogOpen(true)}
               aria-label="Delete endpoint"
               className="h-7 px-2.5 text-xs gap-1.5"
             >
@@ -126,6 +127,19 @@ export function EndpointPage() {
             </Button>
           </Tooltip>
         </div>
+
+        {/* Delete endpoint confirmation dialog */}
+        <ConfirmDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          title="Delete endpoint?"
+          description="This will permanently delete the endpoint and all its captured requests. This action cannot be undone."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={handleDeleteEndpoint}
+          loading={deleting}
+          icon={<Trash2 className="h-4 w-4 text-muted-foreground" />}
+        />
       </header>
 
       {/* ── Split panel ── */}

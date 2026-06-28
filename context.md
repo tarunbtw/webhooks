@@ -1,36 +1,65 @@
-# Project Context — webhook-inspector
+# Project Context
 
-## Project Structure
-```
-webhooks/
+This document contains the directory structure and the full contents of all source, configuration, and setup files in the `webhook-inspector` project.
+
+---
+
+## Directory Structure
+
+```text
+.
 ├── .env.example
 ├── .gitignore
 ├── docker-compose.yml
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-├── backend/
-│   ├── Dockerfile
-│   ├── go.mod
-│   ├── cmd/
-│   │   └── server/
+├── backend
+│   ├── cmd
+│   │   └── server
 │   │       └── main.go
-│   └── internal/
-│       ├── cleanup/
-│       │   └── cleanup.go
-│       ├── db/
-│       │   ├── db.go
-│       │   └── schema.sql
-│       ├── handler/
-│       │   ├── cors.go
-│       │   ├── endpoint.go
-│       │   ├── receiver.go
-│       │   └── request.go
-│       ├── models/
-│       │   └── models.go
-│       └── ws/
-│           └── hub.go
-└── frontend/
+│   ├── internal
+│   │   ├── cleanup
+│   │   │   └── cleanup.go
+│   │   ├── db
+│   │   │   ├── db.go
+│   │   │   └── schema.sql
+│   │   ├── handler
+│   │   │   ├── cors.go
+│   │   │   ├── endpoint.go
+│   │   │   ├── receiver.go
+│   │   │   └── request.go
+│   │   ├── models
+│   │   │   └── models.go
+│   │   └── ws
+│   │       └── hub.go
+│   ├── Dockerfile
+│   └── go.mod
+└── frontend
+    ├── src
+    │   ├── api
+    │   │   └── client.ts
+    │   ├── components
+    │   │   ├── ui
+    │   │   │   ├── badge.tsx
+    │   │   │   ├── button.tsx
+    │   │   │   ├── input.tsx
+    │   │   │   ├── separator.tsx
+    │   │   │   └── tooltip.tsx
+    │   │   ├── CopyButton.tsx
+    │   │   ├── RequestDetail.tsx
+    │   │   ├── RequestList.tsx
+    │   │   ├── ThemeProvider.tsx
+    │   │   └── ThemeToggle.tsx
+    │   ├── hooks
+    │   │   └── useWebSocket.ts
+    │   ├── lib
+    │   │   └── utils.ts
+    │   ├── pages
+    │   │   ├── EndpointPage.tsx
+    │   │   └── HomePage.tsx
+    │   ├── types
+    │   │   └── index.ts
+    │   ├── App.tsx
+    │   ├── index.css
+    │   └── main.tsx
     ├── Dockerfile
     ├── index.html
     ├── nginx.conf
@@ -39,39 +68,58 @@ webhooks/
     ├── tailwind.config.js
     ├── tsconfig.json
     ├── tsconfig.node.json
-    ├── vite.config.ts
-    └── src/
-        ├── App.tsx
-        ├── index.css
-        ├── main.tsx
-        ├── api/
-        │   └── client.ts
-        ├── components/
-        │   ├── CopyButton.tsx
-        │   ├── RequestDetail.tsx
-        │   └── RequestList.tsx
-        ├── hooks/
-        │   └── useWebSocket.ts
-        ├── pages/
-        │   ├── EndpointPage.tsx
-        │   └── HomePage.tsx
-        └── types/
-            └── index.ts
+    └── vite.config.ts
 ```
 
 ---
 
-## File Contents
+## Root Configurations
 
 ### `.env.example`
-```
+```ini
 # Copy to .env for local development outside Docker
 DATABASE_URL=postgres://inspector:inspector@localhost:5432/inspector?sslmode=disable
 ADDR=:8080
 ```
 
 ### `.gitignore`
-```
+```text
+# Local
+.env
+.env.local
+
+# IDEs and OS overhead
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Frontend
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.eslintcache
+.vite/
+
+# Backend
+backend/server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Docker
+pgdata/
+
+# eh
 agents
 ```
 
@@ -118,103 +166,9 @@ volumes:
   pgdata:
 ```
 
-### `.github/workflows/ci.yml`
-```yaml
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  backend:
-    name: Backend
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: inspector
-          POSTGRES_PASSWORD: inspector
-          POSTGRES_DB: inspector
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U inspector -d inspector"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
-          cache: true
-
-      - name: Download dependencies
-        working-directory: backend
-        run: go mod download
-
-      - name: Verify dependencies
-        working-directory: backend
-        run: go mod verify
-
-      - name: Build
-        working-directory: backend
-        run: go build ./...
-
-      - name: Vet
-        working-directory: backend
-        run: go vet ./...
-
-  frontend:
-    name: Frontend
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm install
-
-      - name: Type check
-        working-directory: frontend
-        run: npx tsc --noEmit
-
-      - name: Build
-        working-directory: frontend
-        run: npm run build
-
-  docker:
-    name: Docker build
-    runs-on: ubuntu-latest
-    needs: [backend, frontend]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build backend image
-        run: docker build ./backend
-
-      - name: Build frontend image
-        run: docker build ./frontend
-```
-
 ---
+
+## Backend Source Code
 
 ### `backend/Dockerfile`
 ```dockerfile
@@ -249,7 +203,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/text. v0.21.0 // indirect
 )
 ```
 
@@ -489,7 +443,7 @@ import "net/http"
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 		if r.Method == http.MethodOptions {
@@ -1057,6 +1011,10 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	h.subscribe(endpointID, c)
 	defer h.unsubscribe(endpointID, c)
 
+	// done is closed when the read loop exits (client disconnects).
+	// the ping goroutine selects on it to exit cleanly — no goroutine leak.
+	done := make(chan struct{})
+
 	// writer goroutine — sends queued messages to the client
 	go func() {
 		defer conn.Close()
@@ -1079,10 +1037,16 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
+	// ping goroutine — exits via done channel when client disconnects
 	go func() {
-		for range ticker.C {
-			conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+		for {
+			select {
+			case <-ticker.C:
+				conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					return
+				}
+			case <-done:
 				return
 			}
 		}
@@ -1095,7 +1059,8 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	close(c.send)
+	close(done)    // signal ping goroutine to exit
+	close(c.send)  // signal writer goroutine to exit
 }
 
 func (h *Hub) subscribe(endpointID string, c *client) {
@@ -1123,6 +1088,8 @@ func (h *Hub) unsubscribe(endpointID string, c *client) {
 
 ---
 
+## Frontend Source Code
+
 ### `frontend/Dockerfile`
 ```dockerfile
 # Stage 1 — build
@@ -1142,6 +1109,22 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
+```
+
+### `frontend/index.html`
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>webhook inspector</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
 ```
 
 ### `frontend/nginx.conf`
@@ -1201,28 +1184,12 @@ server {
 }
 ```
 
-### `frontend/index.html`
-```html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>webhook inspector</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
-```
-
 ### `frontend/package.json`
 ```json
 {
   "name": "webhook-inspector-frontend",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -1230,10 +1197,15 @@ server {
     "preview": "vite preview"
   },
   "dependencies": {
-    "@tremor/react": "^3.18.3",
+    "@radix-ui/react-tooltip": "^1.1.6",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.468.0",
+    "next-themes": "^0.4.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.0"
+    "react-router-dom": "^6.28.0",
+    "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
@@ -1262,12 +1234,48 @@ export default {
 ```javascript
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
-    './node_modules/@tremor/**/*.{js,ts,jsx,tsx}',
   ],
-  theme: { extend: {} },
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      colors: {
+        background:       'hsl(var(--background))',
+        foreground:       'hsl(var(--foreground))',
+        muted:            'hsl(var(--muted))',
+        'muted-foreground': 'hsl(var(--muted-foreground))',
+        border:           'hsl(var(--border))',
+        input:            'hsl(var(--input))',
+        ring:             'hsl(var(--ring))',
+        card: {
+          DEFAULT:     'hsl(var(--card))',
+          foreground:  'hsl(var(--card-foreground))',
+        },
+        accent: {
+          DEFAULT:     'hsl(var(--accent))',
+          foreground:  'hsl(var(--accent-foreground))',
+        },
+        primary: {
+          DEFAULT:     'hsl(var(--primary))',
+          foreground:  'hsl(var(--primary-foreground))',
+        },
+        destructive: {
+          DEFAULT:     'hsl(var(--destructive))',
+          foreground:  'hsl(var(--destructive-foreground))',
+        },
+      },
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
+      },
+    },
+  },
   plugins: [],
 }
 ```
@@ -1341,29 +1349,107 @@ export default defineConfig({
 })
 ```
 
----
-
 ### `frontend/src/App.tsx`
 ```tsx
 import { Routes, Route } from 'react-router-dom'
+import { ThemeProvider } from './components/ThemeProvider'
+import { TooltipProvider } from './components/ui/tooltip'
 import { HomePage } from './pages/HomePage'
 import { EndpointPage } from './pages/EndpointPage'
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/e/:id" element={<EndpointPage />} />
-    </Routes>
+    <ThemeProvider>
+      <TooltipProvider>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/e/:id" element={<EndpointPage />} />
+        </Routes>
+      </TooltipProvider>
+    </ThemeProvider>
   )
 }
 ```
 
 ### `frontend/src/index.css`
 ```css
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* Zinc-based monochrome — light */
+    --background:         0 0% 98%;      /* zinc-50 */
+    --foreground:         240 6% 10%;    /* zinc-900 */
+
+    --card:               0 0% 100%;     /* white */
+    --card-foreground:    240 6% 10%;
+
+    --muted:              240 5% 96%;    /* zinc-100 */
+    --muted-foreground:   240 4% 46%;    /* zinc-500 */
+
+    --border:             240 6% 90%;    /* zinc-200 */
+    --input:              240 6% 90%;
+
+    --accent:             240 5% 96%;    /* zinc-100 */
+    --accent-foreground:  240 6% 10%;
+
+    --primary:            240 6% 10%;    /* zinc-900 */
+    --primary-foreground: 0 0% 98%;      /* zinc-50 */
+
+    --destructive:        0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --ring:               240 6% 10%;
+    --radius:             0.5rem;
+  }
+
+  .dark {
+    /* Zinc-based monochrome — dark */
+    --background:         240 10% 4%;    /* zinc-950 */
+    --foreground:         0 0% 98%;      /* zinc-50 */
+
+    --card:               240 6% 10%;    /* zinc-900 */
+    --card-foreground:    0 0% 98%;
+
+    --muted:              240 5% 15%;    /* zinc-800/900 blend */
+    --muted-foreground:   240 5% 65%;    /* zinc-400 */
+
+    --border:             240 5% 18%;    /* zinc-800 */
+    --input:              240 5% 18%;
+
+    --accent:             240 5% 15%;
+    --accent-foreground:  0 0% 98%;
+
+    --primary:            0 0% 98%;      /* zinc-50 */
+    --primary-foreground: 240 6% 10%;   /* zinc-900 */
+
+    --destructive:        0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --ring:               240 5% 65%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Smooth theme transitions — exclude layout-affecting props to avoid jank */
+  *,
+  *::before,
+  *::after {
+    transition-property: color, background-color, border-color, opacity, box-shadow;
+    transition-duration: 150ms;
+    transition-timing-function: ease;
+  }
+}
 ```
 
 ### `frontend/src/main.tsx`
@@ -1431,7 +1517,9 @@ export const api = {
 ### `frontend/src/components/CopyButton.tsx`
 ```tsx
 import { useState } from 'react'
-import { Button } from '@tremor/react'
+import { Copy, Check } from 'lucide-react'
+import { Button } from './ui/button'
+import { Tooltip } from './ui/tooltip'
 
 interface Props {
   text: string
@@ -1448,9 +1536,15 @@ export function CopyButton({ text, label = 'Copy' }: Props) {
   }
 
   return (
-    <Button size="xs" variant="secondary" onClick={copy}>
-      {copied ? '✓ Copied' : label}
-    </Button>
+    <Tooltip content={copied ? 'Copied!' : label} side="bottom">
+      <Button variant="ghost" size="icon" onClick={copy} aria-label={label}>
+        {copied ? (
+          <Check className="h-3.5 w-3.5 text-foreground" />
+        ) : (
+          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
+      </Button>
+    </Tooltip>
   )
 }
 ```
@@ -1458,16 +1552,22 @@ export function CopyButton({ text, label = 'Copy' }: Props) {
 ### `frontend/src/components/RequestDetail.tsx`
 ```tsx
 import { useState } from 'react'
-import { Button, Card, Badge, Text, Title, TextInput } from '@tremor/react'
-import type { Request } from '../types'
+import { Trash2, Send, ChevronRight } from 'lucide-react'
+import { cn } from '../lib/utils'
+import { Button } from './ui/button'
+import { Badge } from './ui/badge'
+import { Input } from './ui/input'
+import { Separator } from './ui/separator'
 import { api } from '../api/client'
+import type { Request } from '../types'
 
 interface Props {
   request: Request
   onDelete: (id: string) => void
 }
 
-// pretty prints string if valid JSON
+type Tab = 'headers' | 'query' | 'body' | 'replay'
+
 function tryPrettyJSON(str: string): string {
   try {
     return JSON.stringify(JSON.parse(str), null, 2)
@@ -1476,7 +1576,41 @@ function tryPrettyJSON(str: string): string {
   }
 }
 
+/** Key-value table with zebra rows */
+function KVTable({ data }: { data: Record<string, string> }) {
+  const entries = Object.entries(data)
+  if (entries.length === 0) {
+    return (
+      <div className="rounded-md border border-border bg-muted/30 px-4 py-6 text-center">
+        <p className="text-xs text-muted-foreground italic">No entries</p>
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-md border border-border overflow-hidden">
+      {entries.map(([k, v], i) => (
+        <div
+          key={k}
+          className={cn(
+            'grid grid-cols-[200px_1fr] gap-0 text-xs font-mono',
+            i % 2 === 0 ? 'bg-card' : 'bg-muted/30',
+            i !== entries.length - 1 && 'border-b border-border'
+          )}
+        >
+          <div className="px-3 py-2 text-muted-foreground border-r border-border truncate font-medium">
+            {k}
+          </div>
+          <div className="px-3 py-2 text-foreground break-all">
+            {v}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function RequestDetail({ request, onDelete }: Props) {
+  const [tab, setTab] = useState<Tab>('headers')
   const [replayUrl, setReplayUrl] = useState('')
   const [replayResult, setReplayResult] = useState<{ status: number; body: string } | null>(null)
   const [replaying, setReplaying] = useState(false)
@@ -1502,108 +1636,161 @@ export function RequestDetail({ request, onDelete }: Props) {
     onDelete(request.id)
   }
 
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'headers', label: 'Headers' },
+    { id: 'query',   label: 'Query' },
+    { id: 'body',    label: 'Body' },
+    { id: 'replay',  label: 'Replay' },
+  ]
+
+  const methodVariant = request.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'default'
+
   return (
-    <div className="h-full overflow-y-auto p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Badge color="blue">{request.method}</Badge>
-          <Text className="text-xs text-gray-500">
+    <div className="flex flex-col h-full bg-background">
+      {/* ── Request meta bar ── */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card flex-shrink-0">
+        <Badge variant={methodVariant}>{request.method}</Badge>
+
+        <div className="flex items-center gap-3 min-w-0 flex-1 text-xs text-muted-foreground">
+          <span className="tabular-nums shrink-0">
             {new Date(request.received_at).toLocaleString()}
-          </Text>
-          <Text className="text-xs text-gray-400">{request.size} bytes</Text>
+          </span>
+          <span className="hidden sm:inline shrink-0 tabular-nums">
+            {request.size} bytes
+          </span>
+          {request.ip && (
+            <span className="hidden md:inline font-mono truncate text-muted-foreground/60">
+              {request.ip}
+            </span>
+          )}
         </div>
+
         <Button
-          size="xs"
-          variant="secondary"
-          color="red"
+          variant="destructive"
+          size="sm"
           onClick={handleDelete}
           loading={deleting}
+          aria-label="Delete request"
+          className="h-7 px-2.5 text-xs gap-1.5 shrink-0"
         >
-          Delete
+          <Trash2 className="h-3 w-3" />
+          <span className="hidden sm:inline">Delete</span>
         </Button>
       </div>
 
-      {/* Headers */}
-      <Card>
-        <Title className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          Headers
-        </Title>
-        <div className="space-y-1">
-          {Object.entries(request.headers).map(([k, v]) => (
-            <div key={k} className="flex gap-2 text-xs font-mono">
-              <span className="text-gray-400 min-w-0 flex-shrink-0">{k}:</span>
-              <span className="text-gray-700 break-all">{v}</span>
+      {/* ── Tabs ── */}
+      <div className="flex border-b border-border bg-muted/30 flex-shrink-0">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              'flex items-center gap-1 px-4 py-2.5 text-xs font-medium transition-colors relative',
+              'hover:text-foreground focus-visible:outline-none',
+              tab === t.id
+                ? 'text-foreground bg-background border-b-2 border-b-foreground -mb-px'
+                : 'text-muted-foreground hover:bg-muted/50'
+            )}
+          >
+            {t.label}
+            {t.id === 'query' && Object.keys(request.query_params).length > 0 && (
+              <span className="ml-1 rounded bg-muted px-1 py-0.5 text-[10px] font-mono tabular-nums text-muted-foreground">
+                {Object.keys(request.query_params).length}
+              </span>
+            )}
+            {t.id === 'headers' && (
+              <span className="ml-1 rounded bg-muted px-1 py-0.5 text-[10px] font-mono tabular-nums text-muted-foreground">
+                {Object.keys(request.headers).length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Tab content ── */}
+      <div className="flex-1 overflow-y-auto p-4 min-h-0 space-y-3">
+        {tab === 'headers' && <KVTable data={request.headers} />}
+
+        {tab === 'query' && <KVTable data={request.query_params} />}
+
+        {tab === 'body' && (
+          request.body ? (
+            <pre className={cn(
+              'text-xs font-mono rounded-md border border-border',
+              'bg-card p-4 overflow-x-auto whitespace-pre-wrap break-all',
+              'text-foreground leading-relaxed'
+            )}>
+              {tryPrettyJSON(request.body)}
+            </pre>
+          ) : (
+            <div className="rounded-md border border-border bg-muted/30 px-4 py-6 text-center">
+              <p className="text-xs text-muted-foreground italic">Empty body</p>
             </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Query Params */}
-      {Object.keys(request.query_params).length > 0 && (
-        <Card>
-          <Title className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Query Parameters
-          </Title>
-          <div className="space-y-1">
-            {Object.entries(request.query_params).map(([k, v]) => (
-              <div key={k} className="flex gap-2 text-xs font-mono">
-                <span className="text-gray-400">{k}:</span>
-                <span className="text-gray-700">{v}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* Body */}
-      <Card>
-        <Title className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          Body
-        </Title>
-        {request.body ? (
-          <pre className="text-xs font-mono bg-gray-50 p-3 rounded overflow-x-auto text-gray-800 whitespace-pre-wrap break-all">
-            {tryPrettyJSON(request.body)}
-          </pre>
-        ) : (
-          <Text className="text-xs text-gray-400">empty body</Text>
+          )
         )}
-      </Card>
 
-      {/* Replay */}
-      <Card>
-        <Title className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          Replay
-        </Title>
-        <div className="flex gap-2">
-          <TextInput
-            placeholder="https://your-server.com/webhook"
-            value={replayUrl}
-            onChange={(e) => setReplayUrl(e.target.value)}
-            className="flex-1"
-          />
-          <Button size="sm" onClick={handleReplay} loading={replaying} disabled={!replayUrl}>
-            Send
-          </Button>
-        </div>
-        {replayResult && (
-          <div className="mt-3">
-            <Badge color={replayResult.status >= 200 && replayResult.status < 300 ? 'green' : 'red'}>
-              {replayResult.status || 'Error'}
-            </Badge>
-            {replayResult.body && (
-              <pre className="text-xs font-mono bg-gray-50 p-2 rounded mt-2 overflow-x-auto whitespace-pre-wrap break-all">
-                {tryPrettyJSON(replayResult.body)}
-              </pre>
+        {tab === 'replay' && (
+          <div className="space-y-4">
+            <div className="rounded-md border border-border bg-card p-4 space-y-3">
+              <div>
+                <p className="text-xs font-medium text-foreground mb-0.5">Target URL</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Re-sends this {request.method} request with the original headers and body.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://your-server.com/webhook"
+                    value={replayUrl}
+                    onChange={(e) => setReplayUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleReplay()}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleReplay}
+                    loading={replaying}
+                    disabled={!replayUrl}
+                    size="sm"
+                    className="shrink-0 gap-1.5"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Send
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {replayResult && (
+              <div className="rounded-md border border-border bg-card overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/40">
+                  <span className="text-xs font-medium text-muted-foreground">Response</span>
+                  <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
+                  <Badge
+                    variant={replayResult.status >= 200 && replayResult.status < 300 ? 'default' : 'destructive'}
+                  >
+                    {replayResult.status || 'Error'}
+                  </Badge>
+                </div>
+                {replayResult.body ? (
+                  <pre className="text-xs font-mono p-4 overflow-x-auto whitespace-pre-wrap break-all text-foreground leading-relaxed">
+                    {tryPrettyJSON(replayResult.body)}
+                  </pre>
+                ) : (
+                  <div className="px-4 py-3">
+                    <p className="text-xs text-muted-foreground italic">Empty response body</p>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
-      </Card>
+      </div>
 
-      {/* Meta */}
-      <div className="text-xs text-gray-400 space-y-1">
-        <div>ID: <span className="font-mono">{request.id}</span></div>
-        {request.ip && <div>Source IP: <span className="font-mono">{request.ip}</span></div>}
+      {/* ── Request ID footer ── */}
+      <Separator />
+      <div className="px-4 py-1.5 bg-muted/20 flex-shrink-0">
+        <p className="text-[10px] font-mono text-muted-foreground/50 truncate">
+          id: {request.id}
+        </p>
       </div>
     </div>
   )
@@ -1612,15 +1799,17 @@ export function RequestDetail({ request, onDelete }: Props) {
 
 ### `frontend/src/components/RequestList.tsx`
 ```tsx
-import { Text } from '@tremor/react'
+import { Inbox } from 'lucide-react'
+import { cn } from '../lib/utils'
+import { Badge } from './ui/badge'
 import type { Request } from '../types'
 
-const METHOD_COLORS: Record<string, string> = {
-  GET: 'bg-emerald-100 text-emerald-700',
-  POST: 'bg-blue-100 text-blue-700',
-  PUT: 'bg-amber-100 text-amber-700',
-  PATCH: 'bg-purple-100 text-purple-700',
-  DELETE: 'bg-red-100 text-red-700',
+const METHOD_VARIANT: Record<string, 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'default'> = {
+  GET:    'GET',
+  POST:   'POST',
+  PUT:    'PUT',
+  PATCH:  'PATCH',
+  DELETE: 'DELETE',
 }
 
 interface Props {
@@ -1640,44 +1829,301 @@ function formatTime(iso: string): string {
 export function RequestList({ requests, selectedId, onSelect }: Props) {
   if (requests.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center p-8">
-        <Text className="text-gray-400 text-sm">No requests yet</Text>
-        <Text className="text-gray-300 text-xs mt-1">
-          Send an HTTP request to your endpoint URL to see it here
-        </Text>
+      <div className="flex flex-col items-center justify-center h-full gap-2 p-8 text-center">
+        <Inbox className="h-8 w-8 text-muted-foreground/40" />
+        <p className="text-sm text-muted-foreground">No requests yet</p>
+        <p className="text-xs text-muted-foreground/60">
+          Send an HTTP request to your endpoint URL
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="overflow-y-auto h-full divide-y divide-gray-100">
-      {requests.map((req) => (
-        <button
-          key={req.id}
-          onClick={() => onSelect(req)}
-          className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
-            selectedId === req.id ? 'bg-blue-50 border-l-2 border-blue-500' : ''
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
-                METHOD_COLORS[req.method] ?? 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              {req.method}
-            </span>
-            <Text className="text-xs text-gray-500">{formatTime(req.received_at)}</Text>
-            <Text className="text-xs text-gray-400 ml-auto">{req.size}B</Text>
-          </div>
-          {req.content_type && (
-            <Text className="text-xs text-gray-400 mt-1 truncate">{req.content_type}</Text>
-          )}
-        </button>
-      ))}
+    <div className="overflow-y-auto h-full">
+      {requests.map((req) => {
+        const isSelected = selectedId === req.id
+        return (
+          <button
+            key={req.id}
+            onClick={() => onSelect(req)}
+            className={cn(
+              'w-full text-left px-3 py-2.5 border-b border-border',
+              'hover:bg-accent transition-colors',
+              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+              isSelected && 'bg-accent border-l-2 border-l-foreground'
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Badge variant={METHOD_VARIANT[req.method] ?? 'default'}>
+                {req.method}
+              </Badge>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {formatTime(req.received_at)}
+              </span>
+              <span className="ml-auto text-xs text-muted-foreground/60 tabular-nums">
+                {req.size}B
+              </span>
+            </div>
+            {req.content_type && (
+              <p className="text-xs text-muted-foreground/60 mt-1 truncate">
+                {req.content_type}
+              </p>
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 }
+```
+
+### `frontend/src/components/ThemeProvider.tsx`
+```tsx
+import { ThemeProvider as NextThemeProvider } from 'next-themes'
+import type { ThemeProviderProps } from 'next-themes'
+
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  return (
+    <NextThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange={false}
+      {...props}
+    >
+      {children}
+    </NextThemeProvider>
+  )
+}
+```
+
+### `frontend/src/components/ThemeToggle.tsx`
+```tsx
+import { useTheme } from 'next-themes'
+import { Sun, Moon } from 'lucide-react'
+import { Button } from './ui/button'
+import { Tooltip } from './ui/tooltip'
+
+export function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme()
+
+  const toggle = () => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
+
+  return (
+    <Tooltip content={resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'} side="bottom">
+      <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
+        <Sun className="h-4 w-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
+        <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
+      </Button>
+    </Tooltip>
+  )
+}
+```
+
+### `frontend/src/components/ui/badge.tsx`
+```tsx
+import * as React from 'react'
+import { cva, type VariantProps } from 'class-variance-authority'
+import { cn } from '../../lib/utils'
+
+const badgeVariants = cva(
+  'inline-flex items-center rounded-sm border px-2 py-0.5 text-xs font-mono font-semibold uppercase tracking-wide transition-colors',
+  {
+    variants: {
+      variant: {
+        default:     'border-transparent bg-primary/10 text-foreground',
+        outline:     'border-border text-muted-foreground',
+        destructive: 'border-transparent bg-destructive/15 text-destructive',
+        GET:         'border-transparent bg-muted text-foreground',
+        POST:        'border-transparent bg-muted text-foreground',
+        PUT:         'border-transparent bg-muted text-foreground',
+        PATCH:       'border-transparent bg-muted text-foreground',
+        DELETE:      'border-transparent bg-destructive/10 text-destructive',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+    },
+  }
+)
+
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLSpanElement>,
+    VariantProps<typeof badgeVariants> {}
+
+function Badge({ className, variant, ...props }: BadgeProps) {
+  return <span className={cn(badgeVariants({ variant }), className)} {...props} />
+}
+
+export { Badge, badgeVariants }
+```
+
+### `frontend/src/components/ui/button.tsx`
+```tsx
+import * as React from 'react'
+import { cva, type VariantProps } from 'class-variance-authority'
+import { cn } from '../../lib/utils'
+
+const buttonVariants = cva(
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  {
+    variants: {
+      variant: {
+        default:     'bg-primary text-primary-foreground hover:bg-primary/90',
+        outline:     'border border-border bg-transparent hover:bg-accent hover:text-accent-foreground',
+        ghost:       'hover:bg-accent hover:text-accent-foreground',
+        destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+        link:        'text-foreground underline-offset-4 hover:underline',
+      },
+      size: {
+        sm:      'h-8 px-3 text-xs',
+        default: 'h-9 px-4 py-2',
+        lg:      'h-11 px-8 text-base',
+        icon:    'h-8 w-8 p-0',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+)
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  loading?: boolean
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, loading, disabled, children, ...props }, ref) => {
+    return (
+      <button
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        disabled={disabled || loading}
+        {...props}
+      >
+        {loading && (
+          <svg
+            className="h-3.5 w-3.5 animate-spin"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+        )}
+        {children}
+      </button>
+    )
+  }
+)
+Button.displayName = 'Button'
+
+export { Button, buttonVariants }
+```
+
+### `frontend/src/components/ui/input.tsx`
+```tsx
+import * as React from 'react'
+import { cn } from '../../lib/utils'
+
+const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
+  ({ className, type, ...props }, ref) => {
+    return (
+      <input
+        type={type}
+        className={cn(
+          'flex h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm shadow-sm',
+          'placeholder:text-muted-foreground',
+          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+          'disabled:cursor-not-allowed disabled:opacity-50',
+          'transition-colors',
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Input.displayName = 'Input'
+
+export { Input }
+```
+
+### `frontend/src/components/ui/separator.tsx`
+```tsx
+import * as React from 'react'
+import { cn } from '../../lib/utils'
+
+const Separator = React.forwardRef<
+  HTMLHRElement,
+  React.HTMLAttributes<HTMLHRElement>
+>(({ className, ...props }, ref) => (
+  <hr
+    ref={ref}
+    className={cn('border-0 border-t border-border', className)}
+    {...props}
+  />
+))
+Separator.displayName = 'Separator'
+
+export { Separator }
+```
+
+### `frontend/src/components/ui/tooltip.tsx`
+```tsx
+import * as React from 'react'
+import * as TooltipPrimitive from '@radix-ui/react-tooltip'
+import { cn } from '../../lib/utils'
+
+const TooltipProvider = TooltipPrimitive.Provider
+const TooltipRoot = TooltipPrimitive.Root
+const TooltipTrigger = TooltipPrimitive.Trigger
+
+const TooltipContent = React.forwardRef<
+  React.ElementRef<typeof TooltipPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
+>(({ className, sideOffset = 6, ...props }, ref) => (
+  <TooltipPrimitive.Content
+    ref={ref}
+    sideOffset={sideOffset}
+    className={cn(
+      'z-50 overflow-hidden rounded-md border border-border bg-card px-2.5 py-1',
+      'text-xs text-card-foreground shadow-sm',
+      'animate-in fade-in-0 zoom-in-95',
+      'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+      'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
+      className
+    )}
+    {...props}
+  />
+))
+TooltipContent.displayName = TooltipPrimitive.Content.displayName
+
+/** Convenience wrapper — renders an icon button with a tooltip */
+function Tooltip({
+  children,
+  content,
+  side = 'bottom',
+}: {
+  children: React.ReactNode
+  content: React.ReactNode
+  side?: 'top' | 'right' | 'bottom' | 'left'
+}) {
+  return (
+    <TooltipRoot delayDuration={300}>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side={side}>{content}</TooltipContent>
+    </TooltipRoot>
+  )
+}
+
+export { Tooltip, TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent }
 ```
 
 ### `frontend/src/hooks/useWebSocket.ts`
@@ -1730,17 +2176,34 @@ export function useWebSocket({ endpointId, onMessage }: Options) {
 }
 ```
 
+### `frontend/src/lib/utils.ts`
+```typescript
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+```
+
 ### `frontend/src/pages/EndpointPage.tsx`
 ```tsx
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Badge, Button, Text } from '@tremor/react'
-import { api } from '../api/client'
-import { useWebSocket } from '../hooks/useWebSocket'
+import { Trash2, Terminal, Activity } from 'lucide-react'
+import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
+import { Separator } from '../components/ui/separator'
+import { Tooltip } from '../components/ui/tooltip'
+import { ThemeToggle } from '../components/ThemeToggle'
+import { CopyButton } from '../components/CopyButton'
 import { RequestList } from '../components/RequestList'
 import { RequestDetail } from '../components/RequestDetail'
-import { CopyButton } from '../components/CopyButton'
+import { api } from '../api/client'
+import { useWebSocket } from '../hooks/useWebSocket'
 import type { Request, WSMessage } from '../types'
+
+const STORAGE_KEY = 'wi-last-endpoint'
 
 export function EndpointPage() {
   const { id } = useParams<{ id: string }>()
@@ -1748,97 +2211,152 @@ export function EndpointPage() {
   const [requests, setRequests] = useState<Request[]>([])
   const [selected, setSelected] = useState<Request | null>(null)
   const [loading, setLoading] = useState(true)
+  const [deleting, setDeleting] = useState(false)
 
   const inspectUrl = `${window.location.origin}/r/${id}`
 
-  // load existing requests on mount
+  // Persist this endpoint so the landing page can offer "Continue"
+  useEffect(() => {
+    if (id) localStorage.setItem(STORAGE_KEY, id)
+  }, [id])
+
+  // Load existing requests on mount
   useEffect(() => {
     if (!id) return
     api.listRequests(id)
-      .then(setRequests)
+      .then((r) => { setRequests(r); setLoading(false) })
       .catch(() => navigate('/'))
-      .finally(() => setLoading(false))
   }, [id, navigate])
 
-  // handle incoming real-time messages
+  // Real-time WebSocket updates
   const onMessage = useCallback((msg: WSMessage) => {
     if (msg.type === 'request.received') {
-      setRequests(prev => [msg.data, ...prev].slice(0, 100))
+      setRequests((prev) => [msg.data, ...prev].slice(0, 100))
     }
   }, [])
 
   useWebSocket({ endpointId: id!, onMessage })
 
-  const handleDelete = (reqId: string) => {
-    setRequests(prev => prev.filter(r => r.id !== reqId))
+  const handleDeleteRequest = (reqId: string) => {
+    setRequests((prev) => prev.filter((r) => r.id !== reqId))
     if (selected?.id === reqId) setSelected(null)
   }
 
   const handleDeleteEndpoint = async () => {
-    if (!confirm('Delete this endpoint and all its requests?')) return
-    await api.deleteEndpoint(id!)
-    navigate('/')
+    if (!confirm('Delete this endpoint and all its requests? This cannot be undone.')) return
+    setDeleting(true)
+    try {
+      await api.deleteEndpoint(id!)
+      localStorage.removeItem(STORAGE_KEY)  // clear persisted endpoint
+      navigate('/')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Text>Loading...</Text>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+          Loading…
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Top bar */}
-      <div className="bg-white border-b px-4 py-3 flex items-center gap-3 flex-wrap">
-        <span
-          className="font-semibold text-gray-800 cursor-pointer hover:underline"
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* ── Top navbar ── */}
+      <header className="flex items-center gap-2 px-3 h-12 border-b border-border bg-card flex-shrink-0">
+        {/* Logo */}
+        <button
           onClick={() => navigate('/')}
+          className="flex items-center gap-1.5 text-sm font-semibold hover:opacity-70 transition-opacity shrink-0"
         >
-          webhook inspector
-        </span>
-        <span className="text-gray-300">/</span>
-        <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono text-gray-700 truncate max-w-sm">
-          {inspectUrl}
-        </code>
-        <CopyButton text={inspectUrl} label="Copy URL" />
-        <Badge color="green" className="ml-auto">
-          {requests.length} requests
-        </Badge>
-        <Button size="xs" variant="secondary" color="red" onClick={handleDeleteEndpoint}>
-          Delete endpoint
-        </Button>
-      </div>
+          <Terminal className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">webhook inspector</span>
+        </button>
 
-      {/* Split view */}
-      <div className="flex flex-1 overflow-hidden">
+        <Separator className="h-4 w-px border-0 bg-border hidden sm:block shrink-0" />
+
+        {/* Endpoint URL + copy */}
+        <div className="flex items-center gap-1 min-w-0 flex-1">
+          <code className="text-xs font-mono text-muted-foreground truncate">
+            {inspectUrl}
+          </code>
+          <CopyButton text={inspectUrl} label="Copy endpoint URL" />
+        </div>
+
+        {/* Live indicator + request count */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Activity className="h-3 w-3 text-muted-foreground/50 animate-pulse" />
+          <Badge variant="outline" className="tabular-nums text-xs">
+            {requests.length} {requests.length === 1 ? 'request' : 'requests'}
+          </Badge>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1 shrink-0">
+          <ThemeToggle />
+          <Tooltip content="Delete endpoint" side="bottom">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteEndpoint}
+              loading={deleting}
+              aria-label="Delete endpoint"
+              className="h-7 px-2.5 text-xs gap-1.5"
+            >
+              <Trash2 className="h-3 w-3" />
+              <span className="hidden sm:inline">Delete</span>
+            </Button>
+          </Tooltip>
+        </div>
+      </header>
+
+      {/* ── Split panel ── */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Left — request list */}
-        <div className="w-64 flex-shrink-0 border-r bg-white overflow-hidden flex flex-col">
-          <div className="px-4 py-2 border-b">
-            <Text className="text-xs text-gray-400 uppercase tracking-wide font-medium">
-              Requests
-            </Text>
+        <div className="w-56 sm:w-64 flex-shrink-0 border-r border-border bg-card flex flex-col overflow-hidden">
+          <div className="px-3 py-2 border-b border-border bg-muted/40 flex-shrink-0">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Incoming Requests
+            </span>
           </div>
-          <RequestList
-            requests={requests}
-            selectedId={selected?.id ?? null}
-            onSelect={setSelected}
-          />
+          <div className="flex-1 overflow-hidden">
+            <RequestList
+              requests={requests}
+              selectedId={selected?.id ?? null}
+              onSelect={setSelected}
+            />
+          </div>
         </div>
 
         {/* Right — request detail */}
-        <div className="flex-1 overflow-hidden bg-white">
+        <div className="flex-1 overflow-hidden bg-background flex flex-col">
           {selected ? (
-            <RequestDetail request={selected} onDelete={handleDelete} />
+            <RequestDetail request={selected} onDelete={handleDeleteRequest} />
           ) : (
             <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <Text className="text-gray-400">Select a request to inspect it</Text>
-                <Text className="text-gray-300 text-xs mt-2">
-                  Or send one to:{' '}
-                  <code className="font-mono">{inspectUrl}</code>
-                </Text>
+              <div className="text-center space-y-3 max-w-xs px-4">
+                <div className="h-10 w-10 rounded-full border border-border flex items-center justify-center mx-auto">
+                  <Activity className="h-4 w-4 text-muted-foreground/50" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">
+                    Waiting for requests
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Select one from the list, or send a request to:
+                  </p>
+                  <p className="text-xs font-mono text-muted-foreground/80 bg-muted rounded px-2 py-1 break-all">
+                    {inspectUrl}
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -1851,18 +2369,68 @@ export function EndpointPage() {
 
 ### `frontend/src/pages/HomePage.tsx`
 ```tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, Title, Text } from '@tremor/react'
+import { Zap, RefreshCcw, Clock, Globe, ArrowRight, Terminal } from 'lucide-react'
+import { Button } from '../components/ui/button'
+import { Separator } from '../components/ui/separator'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { api } from '../api/client'
+
+const FEATURES = [
+  {
+    icon: Zap,
+    title: 'Real-time delivery',
+    description: 'Requests appear instantly via WebSocket — no polling, no refresh.',
+  },
+  {
+    icon: Globe,
+    title: 'Any HTTP method',
+    description: 'GET, POST, PUT, PATCH, DELETE — every method, every content type.',
+  },
+  {
+    icon: RefreshCcw,
+    title: 'Request replay',
+    description: 'Forward any captured request to a target URL with one click.',
+  },
+  {
+    icon: Clock,
+    title: '48-hour TTL',
+    description: 'Requests are automatically cleaned up after 48 hours.',
+  },
+]
+
+const STEPS = [
+  { n: '01', title: 'Create an endpoint', body: 'Click the button below. You get a unique inspect URL instantly — no signup.' },
+  { n: '02', title: 'Send requests to it', body: 'Point any webhook, curl command, or HTTP client at your inspect URL.' },
+  { n: '03', title: 'Inspect in real time', body: 'See headers, body, query params, and source IP as they arrive live.' },
+]
+
+const STORAGE_KEY = 'wi-last-endpoint'
 
 export function HomePage() {
   const [loading, setLoading] = useState(false)
+  const [existingId, setExistingId] = useState<string | null>(null)
   const navigate = useNavigate()
 
-  const create = async () => {
+  // Silently validate any previously saved endpoint in the background
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      api.getEndpoint(saved)
+        .then(() => setExistingId(saved))
+        .catch(() => localStorage.removeItem(STORAGE_KEY))
+    }
+  }, [])
+
+  // If a valid endpoint exists → take them there. Otherwise create a fresh one.
+  const handleCreate = async () => {
     setLoading(true)
     try {
+      if (existingId) {
+        navigate(`/e/${existingId}`)
+        return
+      }
       const ep = await api.createEndpoint()
       navigate(`/e/${ep.id}`)
     } finally {
@@ -1871,23 +2439,130 @@ export function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full text-center">
-        <Title>webhook inspector</Title>
-        <Text className="mt-2 text-gray-500">
-          Get a unique URL. Send any HTTP request to it. Watch it arrive instantly.
-        </Text>
-        <div className="mt-6 space-y-2 text-sm text-gray-400 text-left">
-          <div>→ Any HTTP method (GET, POST, PUT, DELETE, PATCH...)</div>
-          <div>→ Full headers, body, query params</div>
-          <div>→ Real-time via WebSocket</div>
-          <div>→ Replay to any URL</div>
-          <div>→ Persists for 48 hours</div>
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      {/* ── Navbar ── */}
+      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-sm">
+        <div className="mx-auto max-w-5xl px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Terminal className="h-4 w-4 text-foreground" />
+            <span className="text-sm font-semibold tracking-tight">webhook inspector</span>
+          </div>
+          <ThemeToggle />
         </div>
-        <Button className="mt-6 w-full" size="lg" onClick={create} loading={loading}>
-          Create endpoint
-        </Button>
-      </Card>
+      </header>
+
+      {/* ── Hero ── */}
+      <section className="flex-1 flex flex-col items-center justify-center text-center px-4 py-24 gap-8">
+        <div className="space-y-4 max-w-2xl">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
+            Self-hostable · Open source · No signup
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground leading-tight">
+            Inspect webhooks<br />in real time
+          </h1>
+          <p className="text-base text-muted-foreground max-w-lg mx-auto leading-relaxed">
+            Get a unique URL. Send any HTTP request to it. See every header,
+            body, and query parameter arrive instantly — no signup required.
+          </p>
+        </div>
+
+        {/* Two clean buttons — no banner, no extra UI */}
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <Button size="lg" onClick={handleCreate} loading={loading} className="min-w-48">
+            Create endpoint
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+          <Button size="lg" variant="outline" onClick={() => window.open('https://github.com', '_blank')}>
+            View on GitHub
+          </Button>
+        </div>
+
+        {/* Quick usage hint */}
+        <div className="rounded-lg border border-border bg-muted/50 px-4 py-3 text-left max-w-md w-full">
+          <p className="text-xs text-muted-foreground mb-1.5 font-mono">Quick start</p>
+          <code className="text-xs font-mono text-foreground block leading-relaxed">
+            curl -X POST https://your-url/r/&#123;id&#125; \<br />
+            {'  '}-H "Content-Type: application/json" \<br />
+            {'  '}-d '&#123;"hello":"world"&#125;'
+          </code>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* ── Features ── */}
+      <section className="py-20 px-4">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl font-semibold tracking-tight">Everything you need to debug webhooks</h2>
+            <p className="text-sm text-muted-foreground mt-2">No fluff. Just the tools.</p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {FEATURES.map(({ icon: Icon, title, description }) => (
+              <div
+                key={title}
+                className="rounded-lg border border-border bg-card p-5 space-y-3 hover:bg-accent/50 transition-colors"
+              >
+                <div className="h-8 w-8 rounded-md border border-border flex items-center justify-center">
+                  <Icon className="h-4 w-4 text-foreground" />
+                </div>
+                <h3 className="text-sm font-semibold">{title}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* ── How it works ── */}
+      <section className="py-20 px-4">
+        <div className="mx-auto max-w-3xl">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
+          </div>
+          <div className="space-y-0">
+            {STEPS.map(({ n, title, body }, i) => (
+              <div key={n} className="flex gap-6">
+                <div className="flex flex-col items-center">
+                  <div className="h-9 w-9 rounded-full border border-border flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-mono text-muted-foreground">{n}</span>
+                  </div>
+                  {i < STEPS.length - 1 && (
+                    <div className="w-px flex-1 bg-border my-2" />
+                  )}
+                </div>
+                <div className="pb-10 pt-1.5 min-w-0">
+                  <h3 className="text-sm font-semibold mb-1">{title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 flex justify-center">
+            <Button size="lg" onClick={handleCreate} loading={loading} className="min-w-48">
+              Get started
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* ── Footer ── */}
+      <footer className="py-8 px-4">
+        <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Terminal className="h-3 w-3" />
+            <span>webhook inspector</span>
+          </div>
+          <span>Self-hosted · Requests expire after 48 hours</span>
+        </div>
+      </footer>
     </div>
   )
 }
