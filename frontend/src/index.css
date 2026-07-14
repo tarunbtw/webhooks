@@ -87,9 +87,7 @@
 .bg-dot-grid {
   background-image: radial-gradient(circle, hsl(var(--foreground)) 1.5px, transparent 1.5px);
   background-size: 28px 28px;
-  opacity: 0.10;
-  -webkit-mask-image: radial-gradient(ellipse 100% 85% at 50% 30%, black 40%, transparent 82%);
-  mask-image:         radial-gradient(ellipse 100% 85% at 50% 30%, black 40%, transparent 82%);
+  opacity: 0.18;
   animation: grid-drift 20s linear infinite;
   transition: opacity 150ms ease;
 }

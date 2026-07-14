@@ -13,9 +13,6 @@ Inspect HTTP requests in real time. Get a unique URL, point any webhook at it, w
 - Full request detail: headers, body, query params, source IP, size
 - Replay any captured request to a target URL
 - Requests auto-purge after 48 hours
-- Dark mode
-
-No account required. The UUID endpoint ID is your access token.
 
 ---
 
@@ -24,8 +21,8 @@ No account required. The UUID endpoint ID is your access token.
 Requires Docker and Docker Compose.
 
 ```bash
-git clone https://github.com/tarunbtw/webhook-inspector.git
-cd webhook-inspector
+git clone https://github.com/tarunbtw/webhooks.git
+cd webhooks
 docker-compose up --build
 ```
 
@@ -33,73 +30,6 @@ Open `http://localhost`.
 
 ---
 
-## Run locally (dev mode)
-
-Requires Go 1.22+, Node 22+, Docker.
-
-```bash
-# 1. Start postgres
-docker-compose up postgres -d
-
-# 2. Backend — terminal 1
-cd backend
-cp ../.env.example .env   # edit DATABASE_URL if needed
-go run ./cmd/server
-
-# 3. Frontend — terminal 2
-cd frontend
-npm install
-npm run dev
-# → http://localhost:3000
-```
-
-The Vite dev server proxies `/api`, `/r`, and `/ws` to the Go backend on `:8080`.
-
----
-
-## Self-hosting (free)
-
-Recommended stack — all free tiers:
-
-| Service | What runs there |
-|---|---|
-| [Neon](https://neon.tech) or [Supabase](https://supabase.com) | PostgreSQL |
-| [Railway](https://railway.app) or [Render](https://render.com) | Go backend |
-| [Vercel](https://vercel.com) or [Netlify](https://netlify.com) | React frontend |
-
-### Backend env var
-
-```
-DATABASE_URL=postgres://user:pass@host:5432/dbname?sslmode=require
-```
-
-The backend runs schema migrations on startup. Nothing else to configure.
-
-### Frontend on separate origin
-
-If your frontend and backend are on different domains, update `frontend/src/api/client.ts`:
-
-```ts
-// change this
-const BASE = '/api'
-
-// to this
-const BASE = import.meta.env.VITE_API_BASE ?? '/api'
-```
-
-Then set `VITE_API_BASE=https://your-backend.railway.app/api` in your frontend deployment.
-
-### VPS / single server
-
-```bash
-git clone https://github.com/tarunbtw/webhook-inspector.git
-cd webhook-inspector
-docker-compose up -d --build
-```
-
-Put Caddy or nginx in front for HTTPS. App runs on port 80.
-
----
 
 ## Stack
 
@@ -137,7 +67,7 @@ GET    /health                      → { status, db }
 ## Project structure
 
 ```
-webhook-inspector/
+webhooks/
 ├── backend/            Go API server
 │   ├── cmd/server/     entry point
 │   └── internal/
@@ -147,11 +77,13 @@ webhook-inspector/
 │       ├── ws/         WebSocket hub
 │       └── cleanup/    48h TTL background job
 ├── frontend/           React + TypeScript
-│   └── src/
-│       ├── api/        typed fetch client
-│       ├── components/ UI components
-│       ├── hooks/      useWebSocket
-│       └── pages/      HomePage, EndpointPage
+│   ├── src/
+│   │   ├── api/        typed fetch client
+│   │   ├── components/ UI components
+│   │   ├── hooks/      useWebSocket
+│   │   └── pages/      HomePage, EndpointPage
+│   └── vercel.json     SPA route fallback
+├── render.yaml         Render Blueprint (backend service config)
 └── docker-compose.yml
 ```
 

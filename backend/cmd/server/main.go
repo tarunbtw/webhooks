@@ -77,7 +77,14 @@ func main() {
 		json.NewEncoder(w).Encode(resp)
 	})
 
-	addr := getEnv("ADDR", ":8080")
+	// Render (and most PaaS hosts) inject PORT and require the app to bind to it.
+	// ADDR remains supported for docker-compose / local runs. Default stays :8080.
+	addr := ":8080"
+	if port := os.Getenv("PORT"); port != "" {
+		addr = ":" + port
+	} else if a := os.Getenv("ADDR"); a != "" {
+		addr = a
+	}
 	slog.Info("server listening", "addr", addr)
 	if err := http.ListenAndServe(addr, handler.CORS(mux)); err != nil {
 		slog.Error("server error", "err", err)

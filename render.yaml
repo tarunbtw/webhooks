@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: webhook-inspector-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ADDR
+        value: ":8080"
