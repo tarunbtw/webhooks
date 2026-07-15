@@ -16,7 +16,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: ./backend/Dockerfile
+      dockerfile: Dockerfile
     environment:
       - DATABASE_URL=postgres://inspector:inspector@postgres:5432/inspector?sslmode=disable
       - ADDR=:8080
